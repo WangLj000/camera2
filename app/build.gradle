@@ -1,0 +1,129 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.android.camera2'
+    compileSdk 33
+    signingConfigs {
+        RK3568 {
+            keyAlias 'fe-a3568'
+            keyPassword '123456'
+            storeFile file('../key/fe-a3568-old.keystore')
+            storePassword '123456'
+        }
+
+        RK3399 {
+            keyAlias '3399androidkey'
+            keyPassword 'abc.123'
+            storeFile file('../key/3399androidp.keystore')
+            storePassword 'abc.123'
+        }
+    }
+    defaultConfig {
+        applicationId "com.android.camera2"
+        minSdk 26
+        targetSdk 33
+        versionCode 20002101
+        versionName "rk_camera2_v1.0.18"
+        flavorDimensions "platform"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig null
+        }
+        debug {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig null
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    productFlavors {
+        RK3568 {
+            signingConfig signingConfigs.RK3568
+            versionCode 20002101//该风味版本码
+            versionName "1.0"//该风味版本名称
+            dimension "platform"
+        }
+        RK3399 {
+            signingConfig signingConfigs.RK3399
+            versionCode 20002101//该风味版本码
+            versionName "1.0"//该风味版本名称
+            dimension "platform"
+        }
+    }
+    sourceSets {
+        main {
+            java.srcDirs = ['../src','../src_pd','../src_pd_gcam']
+            aidl.srcDirs = ['../src']
+            res.srcDirs = ['../res_p', '../res']
+            manifest.srcFile '../AndroidManifest.xml'
+        }
+    }
+    android.applicationVariants.all {
+        variant ->
+            variant.outputs.all {
+                outputFileName  = "Camera2" + ".apk"
+            }
+    }
+
+}
+gradle.projectsEvaluated {
+    tasks.withType(JavaCompile) {
+        if (options.bootstrapClasspath != null) {
+            Set<File> fileSet = options.bootstrapClasspath.getFiles()
+            List<File> newFileList = new ArrayList<>();
+            newFileList.add(new File("libs/framework.jar"))
+            newFileList.addAll(fileSet)
+            options.bootstrapClasspath = files(
+                    newFileList.toArray()
+            )
+        }
+    }
+}
+dependencies {
+    implementation files('libs/androidx.legacy_legacy-support-v4.jar')
+    implementation files('libs/guava.jar')
+    implementation files('libs/xmp_toolkit.jar')
+    implementation files('libs/android-ex-camera2-portability.jar')
+    implementation files('libs/glide.jar')
+    compileOnly files('libs/framework.jar')
+    // https://mvnrepository.com/artifact/com.github.bumptech.glide/glide
+    compileOnly group: 'com.github.bumptech.glide', name: 'glide', version: '4.8.0'
+    // https://mvnrepository.com/artifact/androidx.collection/collection-ktx
+    implementation group: 'androidx.collection', name: 'collection', version: '1.0.0'
+
+    // https://mvnrepository.com/artifact/androidx.localbroadcastmanager/localbroadcastmanager
+    implementation group: 'androidx.localbroadcastmanager', name: 'localbroadcastmanager', version: '1.1.0'
+}
+
+preBuild {
+    doLast {
+        //def imlFile = file(project.name + ".iml")     //AndroidStudio 3.x 适用
+        //Android studio4.0的app.iml文件路径为项目/.idea/modules/app/app.iml。早期版本，app.iml文件在项目根目录下
+        //def imlFile = file("\\..\\.idea\\modules\\app\\app.iml")
+        def imlFile = file("\\..\\.idea\\modules\\app\\camera2.app.main.iml" )
+        println 'path=' + projectDir.absolutePath
+        //        println 'Change ' + project.name + '.iml order'
+        try {
+            def parsedXml = (new XmlParser()).parse(imlFile)
+            def jdkNode = parsedXml.component[1].orderEntry.find { it.'@type' == 'jdk' }
+            parsedXml.component[1].remove(jdkNode)
+            println 'api =' +  android.compileSdkVersion.substring("android-".length())
+            def sdkString = "Android API " + android.compileSdkVersion.substring("android-".length()) + " Platform"
+            new groovy.util.Node(parsedXml.component[1], 'orderEntry', ['type': 'jdk', 'jdkName': sdkString, 'jdkType': 'Android SDK'])
+            groovy.xml.XmlUtil.serialize(parsedXml, new FileOutputStream(imlFile))
+        } catch (FileNotFoundException e) {
+            // nop, iml not found
+            e.printStackTrace();
+        }
+    }
+}
